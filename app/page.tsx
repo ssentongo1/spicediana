@@ -186,6 +186,7 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true)
   const [activeSlide, setActiveSlide] = useState<{[key: number]: number}>({})
   const [videoMuted, setVideoMuted] = useState<{[key: string]: boolean}>({})
+  const [isMobile, setIsMobile] = useState(false)
   
   // Comments states
   const [comments, setComments] = useState<{[key: number]: Comment[]}>({})
@@ -216,6 +217,13 @@ export default function HomePage() {
   }
 
   useEffect(() => {
+    // Check if mobile
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= 768)
+    }
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+
     // Load cached follow state immediately
     const cachedFollow = localStorage.getItem('following_spice')
     if (cachedFollow !== null) {
@@ -233,6 +241,8 @@ export default function HomePage() {
     fetchAds()
     fetchSpiceProfile()
     fetchSocialTotal()
+
+    return () => window.removeEventListener('resize', checkMobile)
   }, [])
 
   // Listen for storage changes (when user logs in/out)
@@ -307,18 +317,17 @@ export default function HomePage() {
         setSpiceProfile(data)
         setAppFollowers(data.followers || 0)
         
-        const userStr = localStorage.getItem('team_user')
-        if (userStr) {
-          const user = JSON.parse(userStr)
+        // Check if user has followed
+        const userId = getUserId()
+        if (userId && !userId.startsWith('anon_')) {
           const { data: followData } = await supabase
             .from('followers')
             .select('*')
-            .eq('user_id', user.id)
+            .eq('user_id', userId)
             .maybeSingle()
           
           const isFollowed = !!followData
           setIsFollowing(isFollowed)
-          // Cache the result
           localStorage.setItem('following_spice', isFollowed.toString())
         }
       }
@@ -327,15 +336,27 @@ export default function HomePage() {
     }
   }
 
-  async function handleFollowToggle() {
+  // Helper function to get or create user ID
+  function getUserId(): string {
+    // Check if user is logged in
     const userStr = localStorage.getItem('team_user')
-    if (!userStr) {
-      alert('Please login to follow Spice')
-      return
+    if (userStr) {
+      const user = JSON.parse(userStr)
+      return user.id.toString()
     }
+    
+    // Generate anonymous ID for non-logged in users
+    let anonId = localStorage.getItem('anonymous_id')
+    if (!anonId) {
+      anonId = 'anon_' + Math.random().toString(36).substr(2, 9)
+      localStorage.setItem('anonymous_id', anonId)
+    }
+    return anonId
+  }
 
-    const user = JSON.parse(userStr)
-
+  async function handleFollowToggle() {
+    const userId = getUserId()
+    
     // Optimistically update UI
     const newFollowingState = !isFollowing
     setIsFollowing(newFollowingState)
@@ -347,7 +368,7 @@ export default function HomePage() {
         await supabase
           .from('followers')
           .delete()
-          .eq('user_id', user.id)
+          .eq('user_id', userId)
 
         const newCount = appFollowers - 1
         setAppFollowers(newCount)
@@ -360,7 +381,10 @@ export default function HomePage() {
         // Follow
         await supabase
           .from('followers')
-          .insert([{ user_id: user.id }])
+          .insert([{ 
+            user_id: userId,
+            created_at: new Date()
+          }])
 
         const newCount = appFollowers + 1
         setAppFollowers(newCount)
@@ -452,7 +476,7 @@ export default function HomePage() {
     }
   }
 
-  // FIXED: fetchFeedPosts now loads likes AND comments automatically
+  // Fetches feed posts with likes and comments
   async function fetchFeedPosts() {
     try {
       const { data: postsData } = await supabase
@@ -476,59 +500,19 @@ export default function HomePage() {
         })
       )
 
-      // Check for user INSIDE the function
-      const userStr = localStorage.getItem('team_user')
-      if (userStr) {
-        const user = JSON.parse(userStr)
-        const postsWithLikesAndComments = await Promise.all(
-          postsWithMedia.map(async (post) => {
-            const [likeResult, commentsResult] = await Promise.all([
-              supabase
-                .from('feed_likes')
-                .select('*')
-                .eq('post_id', post.id)
-                .eq('user_id', user.id)
-                .maybeSingle(),
-              
-              supabase
-                .from('feed_comments')
-                .select(`
-                  *,
-                  profiles:user_id (
-                    id,
-                    username,
-                    full_name,
-                    avatar_url,
-                    bio,
-                    location,
-                    favorite_song,
-                    is_verified,
-                    is_spice,
-                    created_at,
-                    joined_date
-                  )
-                `)
-                .eq('post_id', post.id)
-                .order('created_at', { ascending: true })
-            ])
+      // Check if user has liked posts
+      const userId = getUserId()
+      const postsWithLikesAndComments = await Promise.all(
+        postsWithMedia.map(async (post) => {
+          const [likeResult, commentsResult] = await Promise.all([
+            supabase
+              .from('feed_likes')
+              .select('*')
+              .eq('post_id', post.id)
+              .eq('user_id', userId)
+              .maybeSingle(),
             
-            // Store comments in state
-            if (commentsResult.data) {
-              setComments(prev => ({ ...prev, [post.id]: commentsResult.data || [] }))
-            }
-            
-            return {
-              ...post,
-              user_has_liked: !!likeResult.data
-            }
-          })
-        )
-        setFeedPosts(postsWithLikesAndComments)
-      } else {
-        // Still fetch comments even when no user
-        const postsWithComments = await Promise.all(
-          postsWithMedia.map(async (post) => {
-            const { data: commentsData } = await supabase
+            supabase
               .from('feed_comments')
               .select(`
                 *,
@@ -548,16 +532,20 @@ export default function HomePage() {
               `)
               .eq('post_id', post.id)
               .order('created_at', { ascending: true })
-            
-            if (commentsData) {
-              setComments(prev => ({ ...prev, [post.id]: commentsData }))
-            }
-            
-            return post
-          })
-        )
-        setFeedPosts(postsWithComments)
-      }
+          ])
+          
+          // Store comments in state
+          if (commentsResult.data) {
+            setComments(prev => ({ ...prev, [post.id]: commentsResult.data || [] }))
+          }
+          
+          return {
+            ...post,
+            user_has_liked: !!likeResult.data
+          }
+        })
+      )
+      setFeedPosts(postsWithLikesAndComments)
     } catch (error) {
       console.error('Error fetching feed:', error)
     }
@@ -676,14 +664,9 @@ export default function HomePage() {
     setShowProfileModal(true)
   }
 
-  // FIXED LIKE FUNCTION - Works perfectly and persists after refresh
+  // Like function - Now works for all visitors
   async function handleFeedLike(postId: number) {
-    const userStr = localStorage.getItem('team_user')
-    if (!userStr) {
-      alert('Please login to like posts')
-      return
-    }
-
+    const userId = getUserId()
     const post = feedPosts[0]
     if (!post) return
 
@@ -697,14 +680,12 @@ export default function HomePage() {
       likes_count: newLikeCount
     }])
 
-    const user = JSON.parse(userStr)
-
     try {
       const { data: existingLike } = await supabase
         .from('feed_likes')
         .select('*')
         .eq('post_id', postId)
-        .eq('user_id', user.id)
+        .eq('user_id', userId)
         .maybeSingle()
 
       if (existingLike) {
@@ -713,7 +694,7 @@ export default function HomePage() {
           .from('feed_likes')
           .delete()
           .eq('post_id', postId)
-          .eq('user_id', user.id)
+          .eq('user_id', userId)
 
         // Decrement the likes_count
         await supabase
@@ -726,7 +707,8 @@ export default function HomePage() {
           .from('feed_likes')
           .insert([{
             post_id: postId,
-            user_id: user.id
+            user_id: userId,
+            created_at: new Date()
           }])
 
         // Increment the likes_count
@@ -749,7 +731,7 @@ export default function HomePage() {
   async function handleAddComment(postId: number) {
     const userStr = localStorage.getItem('team_user')
     if (!userStr) {
-      alert('Please login to comment')
+      alert('Please join Team Spice to comment')
       return
     }
 
@@ -764,7 +746,8 @@ export default function HomePage() {
         .insert([{
           post_id: postId,
           user_id: user.id,
-          content: newComment.trim()
+          content: newComment.trim(),
+          created_at: new Date()
         }])
 
       if (error) throw error
@@ -783,7 +766,6 @@ export default function HomePage() {
       setShowComments(null)
     } else {
       setShowComments(postId)
-      // No need to fetch comments here anymore since they're already loaded
     }
   }
 
@@ -884,28 +866,18 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Action Buttons Row */}
+        {/* Action Buttons Row - NOW WORKS FOR ALL VISITORS */}
         <div className="grid grid-cols-2 gap-2 mb-4">
-          {(() => {
-            const userStr = typeof window !== 'undefined' ? localStorage.getItem('team_user') : null
-            const currentUser = userStr ? JSON.parse(userStr) : null
-            return currentUser && !currentUser.is_spice ? (
-              <button
-                onClick={handleFollowToggle}
-                className={`w-full py-2.5 rounded-lg text-sm font-medium transition ${
-                  isFollowing
-                    ? 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                    : 'bg-pink-600 text-white hover:bg-pink-700'
-                }`}
-              >
-                {isFollowing ? 'Following' : 'Follow'}
-              </button>
-            ) : (
-              <button className="w-full bg-pink-600 text-white py-2.5 rounded-lg text-sm font-medium hover:bg-pink-700 transition opacity-50 cursor-not-allowed" disabled>
-                Follow
-              </button>
-            )
-          })()}
+          <button
+            onClick={handleFollowToggle}
+            className={`w-full py-2.5 rounded-lg text-sm font-medium transition ${
+              isFollowing
+                ? 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                : 'bg-pink-600 text-white hover:bg-pink-700'
+            }`}
+          >
+            {isFollowing ? 'Following' : 'Follow'}
+          </button>
           
           <button
             onClick={handleBusinessClick}
@@ -961,7 +933,7 @@ export default function HomePage() {
 
           {feedPosts.slice(0, 1).map((post) => (
             <div key={post.id} className="bg-white rounded-lg border border-pink-100 overflow-hidden shadow-sm hover:shadow-md transition group">
-              {/* Post Header - Not clickable (keeps like/comment buttons working) */}
+              {/* Post Header - Not clickable */}
               <div className="flex items-center gap-3 p-4">
                 <div className="w-9 h-9 bg-pink-100 rounded-full overflow-hidden flex-shrink-0">
                   {profileImage ? (
@@ -981,8 +953,14 @@ export default function HomePage() {
                 </div>
               </div>
 
-              {/* Media Carousel - Clickable area */}
-              <Link href="/feed" className="block relative w-full bg-black group/media">
+              {/* Media Carousel - Clickable via overlay */}
+              <div className="relative w-full bg-black">
+                {/* Clickable overlay for navigation */}
+                <div 
+                  onClick={() => window.location.href = '/feed'}
+                  className="absolute inset-0 z-10 cursor-pointer"
+                />
+                
                 <Swiper
                   modules={[Navigation, Pagination]}
                   navigation={{
@@ -995,7 +973,7 @@ export default function HomePage() {
                   onSlideChange={(swiper) => {
                     setActiveSlide(prev => ({ ...prev, [post.id]: swiper.activeIndex }))
                   }}
-                  className="aspect-[1/2] md:aspect-auto md:h-[70vh]"
+                  className="aspect-[1/2] md:aspect-auto md:h-[70vh] relative z-0"
                 >
                   {post.media.map((media, index) => {
                     const muteKey = `${post.id}-${media.id}`
@@ -1029,22 +1007,34 @@ export default function HomePage() {
                   })}
                 </Swiper>
 
-                {post.media.length > 1 && (
+                {/* Navigation buttons - Only show on desktop */}
+                {post.media.length > 1 && !isMobile && (
                   <>
-                    <button className={`swiper-button-prev-${post.id} absolute left-2 top-1/2 -translate-y-1/2 z-10 bg-black/50 text-white p-1.5 rounded-full hover:bg-black/70 transition`}>
+                    <button 
+                      className={`swiper-button-prev-${post.id} absolute left-2 top-1/2 -translate-y-1/2 z-20 bg-black/50 text-white p-1.5 rounded-full hover:bg-black/70 transition`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                      }}
+                    >
                       <ChevronLeft size={16} />
                     </button>
-                    <button className={`swiper-button-next-${post.id} absolute right-2 top-1/2 -translate-y-1/2 z-10 bg-black/50 text-white p-1.5 rounded-full hover:bg-black/70 transition`}>
+                    <button 
+                      className={`swiper-button-next-${post.id} absolute right-2 top-1/2 -translate-y-1/2 z-20 bg-black/50 text-white p-1.5 rounded-full hover:bg-black/70 transition`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                      }}
+                    >
                       <ChevronRightIcon size={16} />
                     </button>
-                    
-                    <div className="absolute top-2 right-2 z-10 bg-black/50 text-white px-2 py-0.5 rounded-full text-[9px]">
-                      {activeSlide[post.id] !== undefined ? activeSlide[post.id] + 1 : 1} / {post.media.length}
-                    </div>
                   </>
                 )}
+                
+                {/* Slide counter - Always show */}
+                <div className="absolute top-2 right-2 z-20 bg-black/50 text-white px-2 py-0.5 rounded-full text-[9px]">
+                  {activeSlide[post.id] !== undefined ? activeSlide[post.id] + 1 : 1} / {post.media.length}
+                </div>
 
-                {/* Video mute button - Needs to be separate to prevent navigation */}
+                {/* Video mute button - Needs higher z-index */}
                 {post.media.some(m => m.media_type === 'video') && (
                   <button
                     onClick={(e) => {
@@ -1053,7 +1043,7 @@ export default function HomePage() {
                       const videoMedia = post.media.find(m => m.media_type === 'video')
                       if (videoMedia) toggleVideoMute(videoMedia.id)
                     }}
-                    className="absolute bottom-3 right-3 z-20 bg-black/60 backdrop-blur-sm text-white p-1.5 rounded-full hover:bg-black/80 transition"
+                    className="absolute bottom-3 right-3 z-30 bg-black/60 backdrop-blur-sm text-white p-1.5 rounded-full hover:bg-black/80 transition"
                   >
                     {videoMuted[`${post.id}-${post.media.find(m => m.media_type === 'video')?.id}`] ? (
                       <Volume2 size={12} />
@@ -1062,7 +1052,7 @@ export default function HomePage() {
                     )}
                   </button>
                 )}
-              </Link>
+              </div>
 
               {/* Post Actions - Keep interactive */}
               <div className="p-4">
@@ -1100,7 +1090,7 @@ export default function HomePage() {
                   </div>
                 )}
 
-                {/* Comments Section */}
+                {/* Comments Section - Only for logged in users */}
                 {showComments === post.id && (
                   <div className="mt-4 pt-4 border-t border-pink-100">
                     {/* Comments List */}
@@ -1150,7 +1140,7 @@ export default function HomePage() {
                       ))}
                     </div>
 
-                    {/* Add Comment */}
+                    {/* Add Comment - Only for logged in users */}
                     {(() => {
                       const userStr = typeof window !== 'undefined' ? localStorage.getItem('team_user') : null
                       const currentUser = userStr ? JSON.parse(userStr) : null

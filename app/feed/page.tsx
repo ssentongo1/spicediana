@@ -76,6 +76,7 @@ export default function FeedPage() {
   const [activeSlide, setActiveSlide] = useState<{[key: number]: number}>({})
   const [profileImage, setProfileImage] = useState<string | null>(null)
   const [videoMuted, setVideoMuted] = useState<{[key: string]: boolean}>({})
+  const [isMobile, setIsMobile] = useState(false)
   
   // Comments states
   const [comments, setComments] = useState<{[key: number]: Comment[]}>({})
@@ -90,8 +91,17 @@ export default function FeedPage() {
   const [profileLikesReceived, setProfileLikesReceived] = useState(0)
 
   useEffect(() => {
+    // Check if mobile
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= 768)
+    }
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+
     fetchProfileImage()
     fetchPosts()
+
+    return () => window.removeEventListener('resize', checkMobile)
   }, [])
 
   // Listen for storage changes (when user logs in/out)
@@ -122,6 +132,24 @@ export default function FeedPage() {
     }
   }
 
+  // Helper function to get or create user ID
+  function getUserId(): string {
+    // Check if user is logged in
+    const userStr = localStorage.getItem('team_user')
+    if (userStr) {
+      const user = JSON.parse(userStr)
+      return user.id.toString()
+    }
+    
+    // Generate anonymous ID for non-logged in users
+    let anonId = localStorage.getItem('anonymous_id')
+    if (!anonId) {
+      anonId = 'anon_' + Math.random().toString(36).substr(2, 9)
+      localStorage.setItem('anonymous_id', anonId)
+    }
+    return anonId
+  }
+
   // FIXED: fetchPosts now loads likes AND comments automatically
   async function fetchPosts() {
     try {
@@ -145,59 +173,19 @@ export default function FeedPage() {
         })
       )
 
-      // Check for user INSIDE the function
-      const userStr = localStorage.getItem('team_user')
-      if (userStr) {
-        const user = JSON.parse(userStr)
-        const postsWithLikesAndComments = await Promise.all(
-          postsWithMedia.map(async (post) => {
-            const [likeResult, commentsResult] = await Promise.all([
-              supabase
-                .from('feed_likes')
-                .select('*')
-                .eq('post_id', post.id)
-                .eq('user_id', user.id)
-                .maybeSingle(),
-              
-              supabase
-                .from('feed_comments')
-                .select(`
-                  *,
-                  profiles:user_id (
-                    id,
-                    username,
-                    full_name,
-                    avatar_url,
-                    bio,
-                    location,
-                    favorite_song,
-                    is_verified,
-                    is_spice,
-                    created_at,
-                    joined_date
-                  )
-                `)
-                .eq('post_id', post.id)
-                .order('created_at', { ascending: true })
-            ])
+      // Check if user has liked posts
+      const userId = getUserId()
+      const postsWithLikesAndComments = await Promise.all(
+        postsWithMedia.map(async (post) => {
+          const [likeResult, commentsResult] = await Promise.all([
+            supabase
+              .from('feed_likes')
+              .select('*')
+              .eq('post_id', post.id)
+              .eq('user_id', userId)
+              .maybeSingle(),
             
-            // Store comments in state
-            if (commentsResult.data) {
-              setComments(prev => ({ ...prev, [post.id]: commentsResult.data || [] }))
-            }
-            
-            return {
-              ...post,
-              user_has_liked: !!likeResult.data
-            }
-          })
-        )
-        setPosts(postsWithLikesAndComments)
-      } else {
-        // Still fetch comments even when no user
-        const postsWithComments = await Promise.all(
-          postsWithMedia.map(async (post) => {
-            const { data: commentsData } = await supabase
+            supabase
               .from('feed_comments')
               .select(`
                 *,
@@ -217,16 +205,20 @@ export default function FeedPage() {
               `)
               .eq('post_id', post.id)
               .order('created_at', { ascending: true })
-            
-            if (commentsData) {
-              setComments(prev => ({ ...prev, [post.id]: commentsData }))
-            }
-            
-            return post
-          })
-        )
-        setPosts(postsWithComments)
-      }
+          ])
+          
+          // Store comments in state
+          if (commentsResult.data) {
+            setComments(prev => ({ ...prev, [post.id]: commentsResult.data || [] }))
+          }
+          
+          return {
+            ...post,
+            user_has_liked: !!likeResult.data
+          }
+        })
+      )
+      setPosts(postsWithLikesAndComments)
     } catch (error) {
       console.error('Error fetching feed posts:', error)
     } finally {
@@ -287,15 +279,9 @@ export default function FeedPage() {
     setShowProfileModal(true)
   }
 
-  // FIXED LIKE FUNCTION - Works perfectly and persists after refresh
+  // LIKE FUNCTION - Now works for all visitors
   async function handleLike(postId: number) {
-    const userStr = localStorage.getItem('team_user')
-    if (!userStr) {
-      alert('Please login to like posts')
-      return
-    }
-
-    const user = JSON.parse(userStr)
+    const userId = getUserId()
     const post = posts.find(p => p.id === postId)
     if (!post) return
 
@@ -318,7 +304,7 @@ export default function FeedPage() {
         .from('feed_likes')
         .select('*')
         .eq('post_id', postId)
-        .eq('user_id', user.id)
+        .eq('user_id', userId)
         .maybeSingle()
 
       if (existingLike) {
@@ -327,7 +313,7 @@ export default function FeedPage() {
           .from('feed_likes')
           .delete()
           .eq('post_id', postId)
-          .eq('user_id', user.id)
+          .eq('user_id', userId)
 
         // Decrement the likes_count
         await supabase
@@ -340,7 +326,8 @@ export default function FeedPage() {
           .from('feed_likes')
           .insert([{
             post_id: postId,
-            user_id: user.id
+            user_id: userId,
+            created_at: new Date()
           }])
 
         // Increment the likes_count
@@ -367,7 +354,7 @@ export default function FeedPage() {
   async function handleAddComment(postId: number) {
     const userStr = localStorage.getItem('team_user')
     if (!userStr) {
-      alert('Please login to comment')
+      alert('Please join Team Spice to comment')
       return
     }
 
@@ -382,7 +369,8 @@ export default function FeedPage() {
         .insert([{
           post_id: postId,
           user_id: user.id,
-          content: newComment.trim()
+          content: newComment.trim(),
+          created_at: new Date()
         }])
 
       if (error) throw error
@@ -401,7 +389,6 @@ export default function FeedPage() {
       setShowComments(null)
     } else {
       setShowComments(postId)
-      // No need to fetch comments here anymore since they're already loaded
     }
   }
 
@@ -494,7 +481,7 @@ export default function FeedPage() {
                                 />
                               </div>
                             ) : (
-                              <div className="relative w-full h-full group">
+                              <div className="relative w-full h-full">
                                 <video
                                   src={media.media_url}
                                   className="w-full h-full object-contain"
@@ -503,20 +490,6 @@ export default function FeedPage() {
                                   autoPlay
                                   playsInline
                                 />
-                                <button
-                                  onClick={(e) => {
-                                    e.preventDefault()
-                                    e.stopPropagation()
-                                    toggleVideoMute(post.id, media.id)
-                                  }}
-                                  className="absolute bottom-4 right-4 z-10 bg-black/60 backdrop-blur-sm text-white p-2 rounded-full hover:bg-black/80 transition"
-                                >
-                                  {videoMuted[muteKey] ? (
-                                    <Volume2 size={16} />
-                                  ) : (
-                                    <VolumeX size={16} />
-                                  )}
-                                </button>
                               </div>
                             )}
                           </SwiperSlide>
@@ -524,7 +497,8 @@ export default function FeedPage() {
                       })}
                     </Swiper>
 
-                    {post.media.length > 1 && (
+                    {/* Navigation buttons - Only show on desktop */}
+                    {post.media.length > 1 && !isMobile && (
                       <>
                         <button className={`swiper-button-prev-${post.id} absolute left-2 top-1/2 -translate-y-1/2 z-10 bg-black/50 text-white p-2 rounded-full hover:bg-black/70 transition`}>
                           <ChevronLeft size={20} />
@@ -532,11 +506,31 @@ export default function FeedPage() {
                         <button className={`swiper-button-next-${post.id} absolute right-2 top-1/2 -translate-y-1/2 z-10 bg-black/50 text-white p-2 rounded-full hover:bg-black/70 transition`}>
                           <ChevronRight size={20} />
                         </button>
-                        
-                        <div className="absolute top-3 right-3 z-10 bg-black/50 text-white px-2 py-1 rounded-full text-xs">
-                          {activeSlide[post.id] !== undefined ? activeSlide[post.id] + 1 : 1} / {post.media.length}
-                        </div>
                       </>
+                    )}
+                    
+                    {/* Slide counter - Always show */}
+                    <div className="absolute top-3 right-3 z-10 bg-black/50 text-white px-2 py-1 rounded-full text-xs">
+                      {activeSlide[post.id] !== undefined ? activeSlide[post.id] + 1 : 1} / {post.media.length}
+                    </div>
+
+                    {/* Video mute button */}
+                    {post.media.some(m => m.media_type === 'video') && (
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          const videoMedia = post.media.find(m => m.media_type === 'video')
+                          if (videoMedia) toggleVideoMute(post.id, videoMedia.id)
+                        }}
+                        className="absolute bottom-4 right-4 z-10 bg-black/60 backdrop-blur-sm text-white p-2 rounded-full hover:bg-black/80 transition"
+                      >
+                        {videoMuted[`${post.id}-${post.media.find(m => m.media_type === 'video')?.id}`] ? (
+                          <Volume2 size={16} />
+                        ) : (
+                          <VolumeX size={16} />
+                        )}
+                      </button>
                     )}
                   </div>
                 )}
