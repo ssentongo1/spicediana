@@ -77,6 +77,7 @@ export default function FeedPage() {
   const [profileImage, setProfileImage] = useState<string | null>(null)
   const [videoMuted, setVideoMuted] = useState<{[key: string]: boolean}>({})
   const [isMobile, setIsMobile] = useState(false)
+  const [likingPost, setLikingPost] = useState<number | null>(null)
   
   // Comments states
   const [comments, setComments] = useState<{[key: number]: Comment[]}>({})
@@ -150,7 +151,6 @@ export default function FeedPage() {
     return anonId
   }
 
-  // FIXED: fetchPosts now loads likes AND comments automatically
   async function fetchPosts() {
     try {
       const { data: postsData } = await supabase
@@ -279,11 +279,16 @@ export default function FeedPage() {
     setShowProfileModal(true)
   }
 
-  // LIKE FUNCTION - Now works for all visitors
+  // Like function with double-click protection
   async function handleLike(postId: number) {
+    // Prevent double clicking
+    if (likingPost === postId) return
+    
     const userId = getUserId()
     const post = posts.find(p => p.id === postId)
     if (!post) return
+
+    setLikingPost(postId)
 
     // Optimistically update UI immediately
     const newLikedState = !post.user_has_liked
@@ -348,6 +353,9 @@ export default function FeedPage() {
           : p
       ))
       console.error('Error liking post:', error)
+    } finally {
+      // Clear liking state after 500ms
+      setTimeout(() => setLikingPost(null), 500)
     }
   }
 
@@ -448,7 +456,7 @@ export default function FeedPage() {
                   </div>
                 </div>
 
-                {/* Media Carousel - With working swipe on mobile */}
+                {/* Media Carousel - Instagram perfect height (4:5) */}
                 {post.media && post.media.length > 0 && (
                   <div className="relative w-full bg-black">
                     <Swiper
@@ -466,7 +474,7 @@ export default function FeedPage() {
                       onSlideChange={(swiper) => {
                         setActiveSlide(prev => ({ ...prev, [post.id]: swiper.activeIndex }))
                       }}
-                      className="aspect-[1/2] md:aspect-auto md:h-[70vh]"
+                      className="aspect-[4/5] w-full"
                       touchRatio={1}
                       simulateTouch={true}
                     >
@@ -545,11 +553,12 @@ export default function FeedPage() {
                   <div className="flex items-center gap-4 mb-3">
                     <button
                       onClick={() => handleLike(post.id)}
+                      disabled={likingPost === post.id}
                       className={`flex items-center gap-1 transition ${
                         post.user_has_liked 
                           ? 'text-pink-600' 
                           : 'text-gray-500 hover:text-pink-600'
-                      }`}
+                      } ${likingPost === post.id ? 'opacity-50 cursor-not-allowed' : ''}`}
                     >
                       <Heart size={20} fill={post.user_has_liked ? 'currentColor' : 'none'} />
                       <span className="text-sm font-medium">{post.likes_count}</span>

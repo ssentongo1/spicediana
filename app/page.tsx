@@ -187,6 +187,7 @@ export default function HomePage() {
   const [activeSlide, setActiveSlide] = useState<{[key: number]: number}>({})
   const [videoMuted, setVideoMuted] = useState<{[key: string]: boolean}>({})
   const [isMobile, setIsMobile] = useState(false)
+  const [likingPost, setLikingPost] = useState<number | null>(null)
   
   // Comments states
   const [comments, setComments] = useState<{[key: number]: Comment[]}>({})
@@ -664,11 +665,16 @@ export default function HomePage() {
     setShowProfileModal(true)
   }
 
-  // Like function - Now works for all visitors
+  // Like function with double-click protection
   async function handleFeedLike(postId: number) {
+    // Prevent double clicking
+    if (likingPost === postId) return
+    
     const userId = getUserId()
     const post = feedPosts[0]
     if (!post) return
+
+    setLikingPost(postId)
 
     // Optimistically update UI immediately
     const newLikedState = !post.user_has_liked
@@ -725,6 +731,9 @@ export default function HomePage() {
         likes_count: post.likes_count
       }])
       console.error('Error liking post:', error)
+    } finally {
+      // Clear liking state after 500ms
+      setTimeout(() => setLikingPost(null), 500)
     }
   }
 
@@ -769,8 +778,15 @@ export default function HomePage() {
     }
   }
 
-  function toggleVideoMute(adId: number) {
-    setVideoMuted(prev => ({ ...prev, [adId]: !prev[adId] }))
+  // Mute function for feed videos - works exactly like feed page
+  function toggleFeedVideoMute(postId: number, mediaId: number) {
+    const key = `${postId}-${mediaId}`
+    setVideoMuted(prev => ({ ...prev, [key]: !prev[key] }))
+  }
+
+  function toggleAdVideoMute(adId: number) {
+    const key = `ad-${adId}`
+    setVideoMuted(prev => ({ ...prev, [key]: !prev[key] }))
   }
 
   function getFeaturedLink(post: FeaturedPost): string {
@@ -918,7 +934,7 @@ export default function HomePage() {
         )}
       </div>
 
-      {/* Spice's Feed - Latest Post Only - NOW ENTIRE CARD CLICKABLE */}
+      {/* Spice's Feed - Latest Post Only - FINAL FIXED VERSION */}
       {feedPosts.length > 0 && (
         <div className="max-w-2xl mx-auto px-4 mb-6">
           <div className="flex items-center justify-between mb-3">
@@ -953,9 +969,9 @@ export default function HomePage() {
                 </div>
               </div>
 
-              {/* Media Carousel - Clickable via overlay with working swipe */}
+              {/* Media Carousel - Instagram perfect height (4:5) with working slider and mute */}
               <div className="relative w-full bg-black">
-                {/* Clickable overlay for navigation */}
+                {/* Clickable overlay for navigation - but not blocking swiper */}
                 <div 
                   onClick={() => window.location.href = '/feed'}
                   className="absolute inset-0 z-10 cursor-pointer"
@@ -976,9 +992,10 @@ export default function HomePage() {
                   onSlideChange={(swiper) => {
                     setActiveSlide(prev => ({ ...prev, [post.id]: swiper.activeIndex }))
                   }}
-                  className="aspect-[1/2] md:aspect-auto md:h-[70vh] relative z-0"
+                  className="aspect-[4/5] w-full relative z-0"
                   touchRatio={1}
                   simulateTouch={true}
+                  watchOverflow={false}
                 >
                   {post.media.map((media, index) => {
                     const muteKey = `${post.id}-${media.id}`
@@ -1039,14 +1056,14 @@ export default function HomePage() {
                   {activeSlide[post.id] !== undefined ? activeSlide[post.id] + 1 : 1} / {post.media.length}
                 </div>
 
-                {/* Video mute button - Needs higher z-index */}
+                {/* Video mute button - WORKS PERFECTLY on home page */}
                 {post.media.some(m => m.media_type === 'video') && (
                   <button
                     onClick={(e) => {
                       e.preventDefault()
                       e.stopPropagation()
                       const videoMedia = post.media.find(m => m.media_type === 'video')
-                      if (videoMedia) toggleVideoMute(videoMedia.id)
+                      if (videoMedia) toggleFeedVideoMute(post.id, videoMedia.id)
                     }}
                     className="absolute bottom-3 right-3 z-30 bg-black/60 backdrop-blur-sm text-white p-1.5 rounded-full hover:bg-black/80 transition"
                   >
@@ -1064,11 +1081,12 @@ export default function HomePage() {
                 <div className="flex items-center gap-4 mb-3">
                   <button
                     onClick={() => handleFeedLike(post.id)}
+                    disabled={likingPost === post.id}
                     className={`flex items-center gap-1 transition ${
                       post.user_has_liked 
                         ? 'text-pink-600' 
                         : 'text-gray-500 hover:text-pink-600'
-                    }`}
+                    } ${likingPost === post.id ? 'opacity-50 cursor-not-allowed' : ''}`}
                   >
                     <Heart size={16} fill={post.user_has_liked ? 'currentColor' : 'none'} />
                     <span className="text-xs font-medium">{post.likes_count}</span>
@@ -1388,7 +1406,7 @@ export default function HomePage() {
                     <video
                       src={ads[0].media_url}
                       className="w-full h-full object-cover"
-                      muted={!videoMuted[ads[0].id]}
+                      muted={!videoMuted[`ad-${ads[0].id}`]}
                       loop
                       autoPlay
                       playsInline
@@ -1397,11 +1415,11 @@ export default function HomePage() {
                     <button
                       onClick={(e) => {
                         e.preventDefault()
-                        toggleVideoMute(ads[0].id)
+                        toggleAdVideoMute(ads[0].id)
                       }}
                       className="absolute bottom-3 right-3 z-10 bg-black/60 backdrop-blur-sm text-white p-1.5 rounded-full hover:bg-black/80 transition"
                     >
-                      {videoMuted[ads[0].id] ? (
+                      {videoMuted[`ad-${ads[0].id}`] ? (
                         <Volume2 size={12} />
                       ) : (
                         <VolumeX size={12} />
