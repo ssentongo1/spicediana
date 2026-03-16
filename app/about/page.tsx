@@ -1,10 +1,48 @@
 'use client'
 
 import Link from 'next/link'
-import { ArrowLeft, Mail, Phone, MapPin, Download, Heart, Calendar, Music, Briefcase } from 'lucide-react'
+import { 
+  ArrowLeft, 
+  Mail, 
+  Phone, 
+  MapPin, 
+  Download, 
+  Heart, 
+  Calendar, 
+  Music, 
+  Briefcase,
+  Instagram,
+  Facebook,
+  Youtube,
+  Music2,
+  Globe,
+  Users,
+  TrendingUp,
+  ExternalLink,
+  ChevronRight,
+  X  // This is the X (Twitter) icon
+} from 'lucide-react'
 import { useState, useEffect } from 'react'
 import Image from 'next/image'
 import { supabase } from '@/lib/supabaseClient'
+import LoadingSpinner from '@/components/LoadingSpinner'
+
+// Custom TikTok icon component
+const TikTokIcon = ({ size = 18, className = "" }) => (
+  <svg 
+    width={size} 
+    height={size} 
+    viewBox="0 0 24 24" 
+    fill="none" 
+    xmlns="http://www.w3.org/2000/svg"
+    className={className}
+  >
+    <path 
+      d="M19.59 6.69C18.95 6.26 18.47 5.66 18.16 5C17.85 4.34 17.73 3.62 17.81 2.9H14.43V15.53C14.43 16.41 14.15 17.27 13.64 17.97C13.13 18.67 12.41 19.18 11.59 19.42C10.77 19.66 9.9 19.62 9.1 19.31C8.3 19 7.61 18.43 7.13 17.69C6.65 16.95 6.41 16.08 6.44 15.19C6.47 14.3 6.77 13.44 7.29 12.73C7.81 12.02 8.53 11.49 9.35 11.22C10.17 10.95 11.06 10.95 11.88 11.22V7.8C10.06 7.63 8.25 8.2 6.89 9.35C5.53 10.5 4.75 12.15 4.75 13.89C4.75 15.63 5.53 17.28 6.89 18.43C8.25 19.58 10.06 20.15 11.88 19.98C13.7 19.81 15.38 18.92 16.52 17.54C17.66 16.16 18.18 14.39 18.18 12.58V7.7C19.11 8.32 20.18 8.67 21.27 8.71V5.29C20.62 5.29 19.99 5.08 19.59 4.69V6.69Z" 
+      fill="currentColor"
+    />
+  </svg>
+)
 
 // Types
 interface ProfileData {
@@ -19,6 +57,72 @@ interface ProfileData {
   phone: string
   location: string
   profileImage: string | null
+  socialTotal: string
+}
+
+interface SocialLink {
+  id: number
+  platform: string
+  url: string
+  icon: string
+  is_active: boolean
+  display_order: number
+}
+
+interface SocialStat {
+  id: number
+  platform: string
+  username: string
+  url: string
+  followers: number
+  icon: string
+  is_active: boolean
+  display_order: number
+}
+
+// Platform icons mapping with correct icons
+const platformIcons: { [key: string]: any } = {
+  instagram: Instagram,
+  twitter: X,
+  x: X,
+  tiktok: TikTokIcon,
+  facebook: Facebook,
+  youtube: Youtube,
+  spotify: Music2,
+  apple: Music2,
+  boomplay: Music2,
+  audiomack: Music2,
+  deezer: Music2,
+  amazon: Music2,
+  other: Globe
+}
+
+// Platform colors
+const platformColors: { [key: string]: string } = {
+  instagram: 'from-pink-500 to-purple-500',
+  twitter: 'from-gray-800 to-gray-900',
+  x: 'from-gray-800 to-gray-900',
+  tiktok: 'from-gray-900 to-pink-500',
+  facebook: 'from-blue-600 to-blue-700',
+  youtube: 'from-red-500 to-red-600',
+  spotify: 'from-green-500 to-green-600',
+  apple: 'from-gray-700 to-gray-800',
+  boomplay: 'from-orange-500 to-red-500',
+  audiomack: 'from-yellow-500 to-orange-500',
+  deezer: 'from-purple-600 to-pink-500',
+  amazon: 'from-orange-500 to-orange-600',
+  other: 'from-pink-400 to-pink-500'
+}
+
+// Format follower count
+const formatFollowers = (count: number): string => {
+  if (count >= 1000000) {
+    return (count / 1000000).toFixed(1) + 'M'
+  }
+  if (count >= 1000) {
+    return (count / 1000).toFixed(1) + 'K'
+  }
+  return count.toString()
 }
 
 export default function AboutPage() {
@@ -33,57 +137,83 @@ export default function AboutPage() {
     email: 'booking@spicediana.com',
     phone: '+256 700 000000',
     location: 'Kampala, Uganda',
-    profileImage: null
+    profileImage: null,
+    socialTotal: '10M+'
   })
+  
+  const [socialLinks, setSocialLinks] = useState<SocialLink[]>([])
+  const [socialStats, setSocialStats] = useState<SocialStat[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    fetchProfile()
+    fetchData()
   }, [])
 
-  async function fetchProfile() {
+  async function fetchData() {
     try {
-      const { data } = await supabase
+      // Fetch profile settings
+      const { data: settingsData } = await supabase
         .from('settings')
         .select('*')
         .eq('id', 1)
         .single()
 
-      if (data) {
+      if (settingsData) {
         setProfile({
-          name: data.name || 'Spice Diana',
-          tagline: data.tagline || 'The People\'s Princess',
-          bio: data.bio || profile.bio,
-          born: data.born || 'Kampala, Uganda',
-          genre: data.genre || 'Afrobeat, Dancehall, Pop',
-          yearsActive: data.years_active || '2018 - present',
-          label: data.label || 'Spice Music',
-          email: data.email || 'booking@spicediana.com',
-          phone: data.phone || '+256 700 000000',
-          location: data.location || 'Kampala, Uganda',
-          profileImage: data.profile_image || null
+          name: settingsData.name || 'Spice Diana',
+          tagline: settingsData.tagline || 'The People\'s Princess',
+          bio: settingsData.bio || profile.bio,
+          born: settingsData.born || 'Kampala, Uganda',
+          genre: settingsData.genre || 'Afrobeat, Dancehall, Pop',
+          yearsActive: settingsData.years_active || '2018 - present',
+          label: settingsData.label || 'Spice Music',
+          email: settingsData.email || 'booking@spicediana.com',
+          phone: settingsData.phone || '+256 700 000000',
+          location: settingsData.location || 'Kampala, Uganda',
+          profileImage: settingsData.profile_image || null,
+          socialTotal: settingsData.social_total || '10M+'
         })
       }
+
+      // Fetch social stats (with follower counts)
+      const { data: statsData } = await supabase
+        .from('social_stats')
+        .select('*')
+        .eq('is_active', true)
+        .order('display_order', { ascending: true })
+
+      setSocialStats(statsData || [])
+
+      // Fetch social links (for icons if needed)
+      const { data: linksData } = await supabase
+        .from('social_links')
+        .select('*')
+        .eq('is_active', true)
+        .order('display_order', { ascending: true })
+
+      setSocialLinks(linksData || [])
     } catch (error) {
-      console.error('Error fetching profile:', error)
+      console.error('Error fetching data:', error)
     } finally {
       setLoading(false)
     }
   }
 
+  // PREMIUM LOADING SPINNER
   if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-b from-pink-50 to-white flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-pink-200 border-t-pink-600 rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading...</p>
-        </div>
-      </div>
-    )
+    return <LoadingSpinner />
   }
 
+  // Calculate total followers from stats
+  const totalFollowers = socialStats.reduce((sum, stat) => sum + (stat.followers || 0), 0)
+  const formattedTotal = totalFollowers >= 1000000 
+    ? (totalFollowers / 1000000).toFixed(1) + 'M' 
+    : totalFollowers >= 1000 
+      ? (totalFollowers / 1000).toFixed(1) + 'K' 
+      : totalFollowers.toString()
+
   return (
-    <div className="min-h-screen bg-gradient-to-b from-pink-50 to-white pb-24">
+    <div className="min-h-screen bg-gradient-to-b from-pink-50 to-white pb-20">
       {/* Header */}
       <header className="bg-white/80 backdrop-blur-md border-b border-pink-100 p-4 sticky top-0 z-20 shadow-sm">
         <div className="max-w-4xl mx-auto flex items-center">
@@ -102,7 +232,7 @@ export default function AboutPage() {
         </div>
       </header>
 
-      {/* Profile Card - Now with dynamic image */}
+      {/* Profile Card */}
       <div className="max-w-4xl mx-auto px-4 py-6">
         <div className="bg-white rounded-2xl shadow-sm border border-pink-100 overflow-hidden">
           {/* Banner with gradient */}
@@ -139,7 +269,7 @@ export default function AboutPage() {
 
       {/* Bio */}
       <div className="max-w-4xl mx-auto px-4 mb-4 md:mb-6">
-        <div className="bg-white rounded-xl md:rounded-2xl shadow-sm border border-pink-100 p-4 md:p-6">
+        <div className="bg-white rounded-xl shadow-sm border border-pink-100 p-4 md:p-6">
           <h3 className="font-semibold text-gray-800 text-base md:text-lg mb-2 md:mb-3 flex items-center gap-2">
             <Heart size={16} className="md:w-5 md:h-5 text-pink-600" />
             Bio
@@ -150,9 +280,106 @@ export default function AboutPage() {
         </div>
       </div>
 
+      {/* ===== NEW PREMIUM SOCIAL MEDIA SECTION ===== */}
+      <div className="max-w-4xl mx-auto px-4 mb-4 md:mb-6">
+        <div className="bg-white rounded-xl shadow-sm border border-pink-100 p-4 md:p-6">
+          {/* Header with total reach */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-6">
+            <div>
+              <h3 className="font-semibold text-gray-800 text-base md:text-lg flex items-center gap-2">
+                <Users size={18} className="text-pink-600" />
+                Connect with Spice
+              </h3>
+              <p className="text-xs text-gray-500 mt-1">Follow on social media for latest updates</p>
+            </div>
+            
+            {/* Total reach badge */}
+            <div className="bg-gradient-to-r from-pink-50 to-pink-100 px-4 py-2 rounded-lg inline-flex items-center gap-2">
+              <TrendingUp size={16} className="text-pink-600" />
+              <span className="text-xs text-gray-600">Total reach:</span>
+              <span className="font-bold text-pink-600">{profile.socialTotal}</span>
+            </div>
+          </div>
+
+          {/* Social Stats Grid */}
+          {socialStats.length > 0 ? (
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+              {socialStats.map((stat) => {
+                const Icon = platformIcons[stat.platform.toLowerCase()] || Globe
+                const color = platformColors[stat.platform.toLowerCase()] || 'from-pink-400 to-pink-500'
+                
+                return (
+                  <a
+                    key={stat.id}
+                    href={stat.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="group relative bg-gradient-to-br from-gray-50 to-white border border-pink-100 rounded-xl p-4 hover:shadow-lg transition-all duration-300 overflow-hidden"
+                  >
+                    {/* Background gradient on hover */}
+                    <div className={`absolute inset-0 bg-gradient-to-br ${color} opacity-0 group-hover:opacity-10 transition-opacity duration-300`} />
+                    
+                    {/* Platform icon */}
+                    <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${color} flex items-center justify-center mb-3 group-hover:scale-110 transition-transform duration-300`}>
+                      <Icon size={18} className="text-white" />
+                    </div>
+                    
+                    {/* Platform name */}
+                    <p className="text-xs font-medium text-gray-500 mb-1">{stat.platform}</p>
+                    
+                    {/* Follower count */}
+                    <p className="text-sm font-bold text-gray-800 mb-2">
+                      {formatFollowers(stat.followers || 0)}
+                    </p>
+                    
+                    {/* Follow button */}
+                    <div className="flex items-center gap-1 text-[10px] font-medium text-pink-600 group-hover:gap-2 transition-all">
+                      <span>Follow</span>
+                      <ExternalLink size={10} />
+                    </div>
+                  </a>
+                )
+              })}
+            </div>
+          ) : (
+            // Fallback to social links if no stats
+            <div className="flex flex-wrap items-center justify-center gap-4">
+              {socialLinks.map((link) => {
+                const Icon = platformIcons[link.platform.toLowerCase()] || Globe
+                const color = platformColors[link.platform.toLowerCase()] || 'from-pink-400 to-pink-500'
+                
+                return (
+                  <a
+                    key={link.id}
+                    href={link.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="group flex flex-col items-center"
+                  >
+                    <div className={`w-12 h-12 rounded-full bg-gradient-to-br ${color} flex items-center justify-center mb-2 group-hover:scale-110 transition-transform duration-300 shadow-md`}>
+                      <Icon size={20} className="text-white" />
+                    </div>
+                    <span className="text-xs text-gray-600">{link.platform}</span>
+                  </a>
+                )
+              })}
+            </div>
+          )}
+
+          {/* View all link (if more than shown) */}
+          {socialStats.length > 4 && (
+            <div className="mt-4 text-center">
+              <button className="inline-flex items-center gap-1 text-xs text-pink-600 hover:gap-2 transition-all">
+                View all platforms <ChevronRight size={12} />
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* Quick Facts */}
       <div className="max-w-4xl mx-auto px-4 mb-4 md:mb-6">
-        <div className="bg-white rounded-xl md:rounded-2xl shadow-sm border border-pink-100 p-4 md:p-6">
+        <div className="bg-white rounded-xl shadow-sm border border-pink-100 p-4 md:p-6">
           <h3 className="font-semibold text-gray-800 text-base md:text-lg mb-3 md:mb-4">Quick Facts</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
             <div className="flex items-start gap-3">
@@ -197,7 +424,7 @@ export default function AboutPage() {
 
       {/* Contact & Booking */}
       <div className="max-w-4xl mx-auto px-4 mb-4 md:mb-6">
-        <div className="bg-white rounded-xl md:rounded-2xl shadow-sm border border-pink-100 p-4 md:p-6">
+        <div className="bg-white rounded-xl shadow-sm border border-pink-100 p-4 md:p-6">
           <h3 className="font-semibold text-gray-800 text-base md:text-lg mb-3 md:mb-4">Booking & Inquiries</h3>
           
           <div className="space-y-3 md:space-y-4">

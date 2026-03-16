@@ -12,6 +12,7 @@ import {
 import { useState, useEffect } from 'react'
 import Image from 'next/image'
 import { supabase } from '@/lib/supabaseClient'
+import LoadingSpinner from '@/components/LoadingSpinner'
 
 // Types
 interface Brand {
@@ -67,19 +68,13 @@ export default function BrandsPage() {
     setShowModal(true)
   }
 
+  // PREMIUM LOADING SPINNER
   if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-b from-pink-50 to-white flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-pink-200 border-t-pink-600 rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading brand partners...</p>
-        </div>
-      </div>
-    )
+    return <LoadingSpinner />
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-pink-50 to-white pb-24">
+    <div className="min-h-screen bg-gradient-to-b from-pink-50 to-white pb-20">
       {/* Header */}
       <header className="bg-white/80 backdrop-blur-md border-b border-pink-100 p-4 sticky top-0 z-20 shadow-sm">
         <div className="max-w-7xl mx-auto flex items-center">
@@ -98,7 +93,7 @@ export default function BrandsPage() {
         </div>
       </header>
 
-      {/* Hero Message - Clean & Premium */}
+      {/* Hero Message */}
       <div className="max-w-7xl mx-auto px-4 py-6">
         <div className="bg-gradient-to-r from-pink-600 to-pink-500 rounded-xl p-4 md:p-6 text-white shadow-md">
           <div className="flex items-center gap-2 md:gap-3 mb-1 md:mb-2">
@@ -130,12 +125,12 @@ export default function BrandsPage() {
                     <div 
                       key={brand.id} 
                       onClick={() => openBrandModal(brand)}
-                      className="bg-white rounded-xl md:rounded-2xl shadow-sm border border-pink-100 overflow-hidden hover:shadow-lg transition-all duration-300 cursor-pointer"
+                      className="bg-white rounded-xl shadow-sm border border-pink-100 overflow-hidden hover:shadow-lg transition-all duration-300 cursor-pointer"
                     >
                       <div className="p-4 md:p-6">
                         <div className="flex flex-col md:flex-row items-start gap-4 md:gap-6">
                           {/* Brand Logo */}
-                          <div className="relative w-20 h-20 md:w-32 md:h-32 bg-pink-50 rounded-lg md:rounded-xl overflow-hidden flex-shrink-0 border-2 border-pink-100">
+                          <div className="relative w-20 h-20 md:w-32 md:h-32 bg-pink-50 rounded-lg overflow-hidden flex-shrink-0 border-2 border-pink-100">
                             {brand.image_url ? (
                               <Image 
                                 src={brand.image_url} 
@@ -143,6 +138,7 @@ export default function BrandsPage() {
                                 fill
                                 sizes="(max-width: 768px) 80px, 128px"
                                 className="object-contain p-2 md:p-4"
+                                loading="lazy"
                               />
                             ) : (
                               <div className="w-full h-full flex items-center justify-center">
@@ -184,23 +180,21 @@ export default function BrandsPage() {
           </div>
         ) : (
           <div className="bg-white rounded-2xl p-8 md:p-16 text-center border border-pink-100">
-            <div className="w-16 h-16 md:w-20 md:h-20 bg-pink-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Briefcase size={24} className="md:w-8 md:h-8 text-pink-400" />
-            </div>
+            <Briefcase size={40} className="mx-auto text-pink-300 mb-4" />
             <h3 className="text-lg md:text-xl font-semibold text-gray-800 mb-2">No brand partners yet</h3>
             <p className="text-sm md:text-base text-gray-500">Check back soon for exciting partnerships</p>
           </div>
         )}
       </div>
 
-      {/* Brand Details Modal - Mobile Optimized */}
+      {/* Brand Details Modal */}
       {showModal && selectedBrand && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-2 md:p-4">
-          <div className="bg-white w-full max-w-2xl rounded-xl md:rounded-3xl shadow-2xl max-h-[98vh] md:max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white w-full max-w-2xl rounded-xl shadow-2xl max-h-[90vh] overflow-y-auto">
             {/* Modal Header */}
-            <div className="sticky top-0 bg-white border-b border-pink-100 p-3 md:p-6 rounded-t-xl md:rounded-t-3xl">
-              <div className="flex items-start gap-2 md:gap-4">
-                <div className="relative w-12 h-12 md:w-16 md:h-16 bg-pink-50 rounded-lg md:rounded-xl overflow-hidden flex-shrink-0 border-2 border-pink-100">
+            <div className="sticky top-0 bg-white border-b border-pink-100 p-4 rounded-t-xl">
+              <div className="flex items-start gap-3">
+                <div className="relative w-12 h-12 md:w-16 md:h-16 bg-pink-50 rounded-lg overflow-hidden flex-shrink-0 border-2 border-pink-100">
                   {selectedBrand.image_url ? (
                     <Image 
                       src={selectedBrand.image_url} 
@@ -231,16 +225,16 @@ export default function BrandsPage() {
                 </div>
                 <button 
                   onClick={() => setShowModal(false)}
-                  className="absolute top-3 right-3 md:static w-8 h-8 md:w-10 md:h-10 rounded-full hover:bg-pink-50 flex items-center justify-center transition flex-shrink-0"
+                  className="w-8 h-8 rounded-full hover:bg-pink-50 flex items-center justify-center"
                 >
-                  <X size={16} className="md:w-5 md:h-5 text-gray-500" />
+                  <X size={16} className="text-gray-500" />
                 </button>
               </div>
             </div>
 
             <div className="p-4 md:p-6">
               {/* Partnership Details */}
-              <div className="bg-pink-50 rounded-lg md:rounded-xl p-3 md:p-4 mb-4 md:mb-6">
+              <div className="bg-pink-50 rounded-lg p-3 md:p-4 mb-4">
                 <p className="text-pink-600 text-sm md:text-base font-medium mb-1">{selectedBrand.partnership}</p>
                 <p className="text-gray-600 text-xs md:text-sm leading-relaxed">{selectedBrand.caption}</p>
               </div>
@@ -250,14 +244,14 @@ export default function BrandsPage() {
                 href={selectedBrand.link}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="w-full bg-gradient-to-r from-pink-600 to-pink-500 text-white py-3 md:py-4 rounded-lg md:rounded-xl text-sm md:text-base font-medium hover:shadow-lg transition flex items-center justify-center gap-2"
+                className="w-full bg-gradient-to-r from-pink-600 to-pink-500 text-white py-3 md:py-4 rounded-lg text-sm md:text-base font-medium hover:shadow-lg transition flex items-center justify-center gap-2"
               >
                 Visit {selectedBrand.brand_name}
                 <ExternalLink size={16} className="md:w-5 md:h-5" />
               </a>
 
               {/* Footer Note */}
-              <div className="mt-4 md:mt-6 pt-4 md:pt-6 border-t border-pink-100">
+              <div className="mt-4 pt-4 border-t border-pink-100">
                 <p className="text-xs md:text-sm text-gray-500 text-center">
                   Proud partner of Spice Diana
                 </p>
@@ -267,7 +261,7 @@ export default function BrandsPage() {
         </div>
       )}
 
-      {/* Footer Note - Updated with link to About page booking section */}
+      {/* Footer Note */}
       {brands.length > 0 && (
         <div className="max-w-7xl mx-auto px-4 mt-8 md:mt-12">
           <div className="bg-pink-50 rounded-xl p-4 md:p-6 text-center">

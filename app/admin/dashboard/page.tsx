@@ -13,8 +13,13 @@ import {
   Info,
   Star,
   Crown,
-  ArrowRight,
+  Image as ImageIcon,
+  Globe,
+  Music2,
+  Youtube,
+  DollarSign,
   Heart,
+  ArrowRight,
   Clock
 } from 'lucide-react'
 
@@ -27,7 +32,7 @@ export default async function AdminDashboardPage() {
   }
 
   // Fetch real stats from Supabase
-  const [musicCount, productsCount, eventsCount, officialCount, brandsCount, blogCount, featuredCount] = await Promise.all([
+  const [musicCount, productsCount, eventsCount, officialCount, brandsCount, blogCount, featuredCount, feedCount, socialCount, streamingCount, youtubeCount, adsCount, ngoCount] = await Promise.all([
     supabase.from('music').select('*', { count: 'exact', head: true }),
     supabase.from('products').select('*', { count: 'exact', head: true }),
     supabase.from('events').select('*', { count: 'exact', head: true }),
@@ -35,6 +40,12 @@ export default async function AdminDashboardPage() {
     supabase.from('brands').select('*', { count: 'exact', head: true }),
     supabase.from('blog_posts').select('*', { count: 'exact', head: true }),
     supabase.from('featured_posts').select('*', { count: 'exact', head: true }),
+    supabase.from('feed_posts').select('*', { count: 'exact', head: true }),
+    supabase.from('social_links').select('*', { count: 'exact', head: true }),
+    supabase.from('streaming_platforms').select('*', { count: 'exact', head: true }),
+    supabase.from('youtube_videos').select('*', { count: 'exact', head: true }),
+    supabase.from('ads').select('*', { count: 'exact', head: true }),
+    supabase.from('ngo_posts').select('*', { count: 'exact', head: true }),
   ])
 
   // Fetch pending posts count for Team Spice
@@ -51,7 +62,13 @@ export default async function AdminDashboardPage() {
     official: officialCount.count || 0,
     brands: brandsCount.count || 0,
     blog: blogCount.count || 0,
-    featured: featuredCount.count || 0
+    featured: featuredCount.count || 0,
+    feed: feedCount.count || 0,
+    social: socialCount.count || 0,
+    streaming: streamingCount.count || 0,
+    youtube: youtubeCount.count || 0,
+    ads: adsCount.count || 0,
+    ngo: ngoCount.count || 0
   }
 
   // Get recent activity
@@ -64,6 +81,18 @@ export default async function AdminDashboardPage() {
   const { data: recentProducts } = await supabase
     .from('products')
     .select('name, created_at')
+    .order('created_at', { ascending: false })
+    .limit(2)
+
+  const { data: recentFeed } = await supabase
+    .from('feed_posts')
+    .select('caption, created_at')
+    .order('created_at', { ascending: false })
+    .limit(2)
+
+  const { data: recentNgo } = await supabase
+    .from('ngo_posts')
+    .select('title, created_at')
     .order('created_at', { ascending: false })
     .limit(2)
 
@@ -105,8 +134,18 @@ export default async function AdminDashboardPage() {
       item: item.name || 'Unnamed', 
       time: new Date(item.created_at).toLocaleDateString() 
     })) || []),
+    ...(recentFeed?.map(item => ({ 
+      action: 'New feed post', 
+      item: item.caption?.substring(0, 30) || 'New post', 
+      time: new Date(item.created_at).toLocaleDateString() 
+    })) || []),
+    ...(recentNgo?.map(item => ({ 
+      action: 'New foundation post', 
+      item: item.title, 
+      time: new Date(item.created_at).toLocaleDateString() 
+    })) || []),
     ...pendingActivities
-  ].slice(0, 4)
+  ].slice(0, 5)
 
   const sections = [
     { name: 'Music', href: '/admin/music', icon: Music, count: stats.music, bg: 'bg-pink-100' },
@@ -117,6 +156,12 @@ export default async function AdminDashboardPage() {
     { name: 'Brands', href: '/admin/brands', icon: Briefcase, count: stats.brands, bg: 'bg-violet-100' },
     { name: 'Blog', href: '/admin/blog', icon: Newspaper, count: stats.blog, bg: 'bg-cyan-100' },
     { name: 'Featured', href: '/admin/featured', icon: Star, count: stats.featured, bg: 'bg-yellow-100' },
+    { name: 'Feed', href: '/admin/feed', icon: ImageIcon, count: stats.feed, bg: 'bg-pink-100' },
+    { name: 'Social Links', href: '/admin/social', icon: Globe, count: stats.social, bg: 'bg-blue-100' },
+    { name: 'Streaming', href: '/admin/streaming', icon: Music2, count: stats.streaming, bg: 'bg-green-100' },
+    { name: 'YouTube', href: '/admin/youtube', icon: Youtube, count: stats.youtube, bg: 'bg-red-100' },
+    { name: 'Ads', href: '/admin/ads', icon: DollarSign, count: stats.ads, bg: 'bg-purple-100' },
+    { name: 'NGO', href: '/admin/ngo', icon: Heart, count: stats.ngo, bg: 'bg-green-100' },
     { name: 'Spice Account', href: '/admin/spice', icon: Crown, count: null, bg: 'bg-yellow-100' },
     { name: 'About', href: '/admin/about', icon: Info, count: null, bg: 'bg-gray-100' },
   ]
@@ -224,17 +269,17 @@ export default async function AdminDashboardPage() {
             <ArrowRight size={16} className="text-gray-400 group-hover:text-pink-600 group-hover:translate-x-1 transition" />
           </Link>
           <Link 
-            href="/admin/events?action=new" 
+            href="/admin/feed?action=new" 
             className="bg-white p-4 rounded-xl border border-pink-100 hover:border-pink-300 transition flex items-center justify-between group"
           >
-            <span className="text-sm text-gray-700">📅 Add Event</span>
+            <span className="text-sm text-gray-700">📸 New Feed Post</span>
             <ArrowRight size={16} className="text-gray-400 group-hover:text-pink-600 group-hover:translate-x-1 transition" />
           </Link>
           <Link 
-            href="/admin/team" 
+            href="/admin/ngo?action=new" 
             className="bg-white p-4 rounded-xl border border-pink-100 hover:border-pink-300 transition flex items-center justify-between group"
           >
-            <span className="text-sm text-gray-700">👥 Moderate Team</span>
+            <span className="text-sm text-gray-700">🤝 New NGO Post</span>
             <ArrowRight size={16} className="text-gray-400 group-hover:text-pink-600 group-hover:translate-x-1 transition" />
           </Link>
         </div>

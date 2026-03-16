@@ -5,6 +5,7 @@ import { ArrowLeft, Music, Play, Pause, Headphones, DollarSign, X, Calendar, Hea
 import { useState, useEffect, useRef } from 'react'
 import Image from 'next/image'
 import { supabase } from '@/lib/supabaseClient'
+import LoadingSpinner from '@/components/LoadingSpinner'
 
 // Types
 interface MusicItem {
@@ -78,7 +79,7 @@ export default function MusicPage() {
   }
 
   function handlePlay(audioUrl: string, id: number, e?: React.MouseEvent) {
-    e?.stopPropagation() // Prevent card click when playing
+    e?.stopPropagation()
     if (playingId === id) {
       audioRef.current?.pause()
       setPlayingId(null)
@@ -114,19 +115,13 @@ export default function MusicPage() {
     setShowModal(true)
   }
 
+  // PREMIUM LOADING SPINNER
   if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-b from-pink-50 to-white flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-pink-200 border-t-pink-600 rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading music library...</p>
-        </div>
-      </div>
-    )
+    return <LoadingSpinner />
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-pink-50 to-white pb-24">
+    <div className="min-h-screen bg-gradient-to-b from-pink-50 to-white pb-20">
       {/* Header */}
       <header className="bg-white/80 backdrop-blur-md border-b border-pink-100 p-4 sticky top-0 z-20 shadow-sm">
         <div className="max-w-7xl mx-auto flex items-center">
@@ -182,7 +177,7 @@ export default function MusicPage() {
                 <div 
                   key={item.id} 
                   onClick={() => openItemModal(item)}
-                  className="bg-white rounded-xl md:rounded-2xl shadow-sm border border-pink-100 overflow-hidden hover:shadow-lg transition-all duration-300 group cursor-pointer"
+                  className="bg-white rounded-xl shadow-sm border border-pink-100 overflow-hidden hover:shadow-md transition-all duration-300 group cursor-pointer"
                 >
                   {/* Cover Image */}
                   <div className="relative h-40 md:h-48 bg-gradient-to-br from-pink-100 to-pink-50">
@@ -193,6 +188,7 @@ export default function MusicPage() {
                         fill
                         sizes="(max-width: 768px) 100vw, 33vw"
                         className="object-cover group-hover:scale-105 transition-transform duration-500"
+                        loading="lazy"
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">
@@ -240,12 +236,10 @@ export default function MusicPage() {
               ))}
             </div>
           ) : (
-            <div className="bg-white rounded-2xl p-8 md:p-16 text-center border border-pink-100">
-              <div className="w-16 h-16 md:w-20 md:h-20 bg-pink-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Music size={24} className="md:w-8 md:h-8 text-pink-400" />
-              </div>
-              <h3 className="text-lg md:text-xl font-semibold text-gray-800 mb-2">No singles available</h3>
-              <p className="text-sm md:text-base text-gray-500">Check back soon for new releases</p>
+            <div className="bg-white rounded-xl p-12 text-center border border-pink-100">
+              <Music size={48} className="mx-auto text-pink-300 mb-4" />
+              <h3 className="text-lg font-semibold text-gray-800 mb-2">No singles available</h3>
+              <p className="text-sm text-gray-500">Check back soon for new releases</p>
             </div>
           )
         ) : (
@@ -255,7 +249,7 @@ export default function MusicPage() {
                 <div 
                   key={item.id} 
                   onClick={() => openItemModal(item)}
-                  className="bg-white rounded-xl md:rounded-2xl shadow-sm border border-pink-100 overflow-hidden hover:shadow-lg transition-all duration-300 group cursor-pointer"
+                  className="bg-white rounded-xl shadow-sm border border-pink-100 overflow-hidden hover:shadow-md transition-all duration-300 group cursor-pointer"
                 >
                   <div className="relative h-40 md:h-48 bg-gradient-to-br from-pink-100 to-pink-50">
                     {item.cover_url ? (
@@ -265,6 +259,7 @@ export default function MusicPage() {
                         fill
                         sizes="(max-width: 768px) 100vw, 33vw"
                         className="object-cover group-hover:scale-105 transition-transform duration-500"
+                        loading="lazy"
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">
@@ -284,31 +279,29 @@ export default function MusicPage() {
               ))}
             </div>
           ) : (
-            <div className="bg-white rounded-2xl p-8 md:p-16 text-center border border-pink-100">
-              <div className="w-16 h-16 md:w-20 md:h-20 bg-pink-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Headphones size={24} className="md:w-8 md:h-8 text-pink-400" />
-              </div>
-              <h3 className="text-lg md:text-xl font-semibold text-gray-800 mb-2">No albums available</h3>
-              <p className="text-sm md:text-base text-gray-500">Check back soon for new releases</p>
+            <div className="bg-white rounded-xl p-12 text-center border border-pink-100">
+              <Headphones size={48} className="mx-auto text-pink-300 mb-4" />
+              <h3 className="text-lg font-semibold text-gray-800 mb-2">No albums available</h3>
+              <p className="text-sm text-gray-500">Check back soon for new releases</p>
             </div>
           )
         )}
       </div>
 
-      {/* Music Details Modal - Mobile Optimized */}
+      {/* Music Details Modal */}
       {showModal && selectedItem && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-2 md:p-4">
-          <div className="bg-white w-full max-w-2xl rounded-xl md:rounded-3xl shadow-2xl max-h-[98vh] md:max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white w-full max-w-2xl rounded-xl shadow-2xl max-h-[90vh] overflow-y-auto">
             {/* Modal Header */}
-            <div className="sticky top-0 bg-white border-b border-pink-100 p-3 md:p-6 rounded-t-xl md:rounded-t-3xl">
-              <div className="flex items-start gap-2 md:gap-4">
-                <div className="relative w-12 h-12 md:w-16 md:h-16 bg-pink-100 rounded-lg md:rounded-xl overflow-hidden flex-shrink-0">
+            <div className="sticky top-0 bg-white border-b border-pink-100 p-4 rounded-t-xl">
+              <div className="flex items-start gap-3">
+                <div className="relative w-12 h-12 md:w-14 md:h-14 bg-pink-100 rounded-lg overflow-hidden flex-shrink-0">
                   {selectedItem.cover_url ? (
                     <Image 
                       src={selectedItem.cover_url} 
                       alt={selectedItem.title} 
                       fill
-                      sizes="64px"
+                      sizes="56px"
                       className="object-cover"
                     />
                   ) : (
@@ -322,61 +315,61 @@ export default function MusicPage() {
                   )}
                 </div>
                 <div className="flex-1 min-w-0 pr-8">
-                  <h2 className="text-base md:text-2xl font-bold text-gray-800 line-clamp-2">{selectedItem.title}</h2>
+                  <h2 className="text-lg md:text-xl font-bold text-gray-800 line-clamp-2">{selectedItem.title}</h2>
                   <div className="flex flex-wrap items-center gap-2 mt-1">
-                    <span className="px-2 py-0.5 bg-pink-100 text-pink-600 rounded-full text-xs font-medium">
+                    <span className="px-2 py-1 bg-pink-100 text-pink-600 rounded-full text-xs font-medium">
                       {selectedItem.type === 'album' ? 'Album' : 'Single'}
                     </span>
                     <span className="text-xs text-gray-400 flex items-center gap-1">
-                      <Calendar size={10} className="md:w-3 md:h-3" />
+                      <Calendar size={12} />
                       {selectedItem.year}
                     </span>
                   </div>
                 </div>
                 <button 
                   onClick={() => setShowModal(false)}
-                  className="absolute top-3 right-3 md:static w-8 h-8 md:w-10 md:h-10 rounded-full hover:bg-pink-50 flex items-center justify-center transition flex-shrink-0"
+                  className="w-8 h-8 rounded-full hover:bg-pink-50 flex items-center justify-center"
                 >
-                  <X size={16} className="md:w-5 md:h-5 text-gray-500" />
+                  <X size={16} className="text-gray-500" />
                 </button>
               </div>
             </div>
 
-            <div className="p-3 md:p-6">
+            <div className="p-4">
               {/* Description */}
               {selectedItem.description && (
-                <div className="mb-4 md:mb-6">
-                  <p className="text-sm md:text-base text-gray-600 leading-relaxed">{selectedItem.description}</p>
+                <div className="mb-4">
+                  <p className="text-sm text-gray-600 leading-relaxed">{selectedItem.description}</p>
                 </div>
               )}
 
               {/* Price */}
-              <div className="bg-pink-50 rounded-lg md:rounded-xl p-3 md:p-4 mb-4 md:mb-6">
+              <div className="bg-pink-50 rounded-lg p-4 mb-4">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs md:text-sm text-gray-600">Price</span>
+                  <span className="text-sm text-gray-600">Price</span>
                   <div className="text-right">
-                    <span className="text-lg md:text-2xl font-bold text-pink-600">${selectedItem.price_usd}</span>
+                    <span className="text-lg md:text-xl font-bold text-pink-600">${selectedItem.price_usd}</span>
                     {selectedItem.price_ugx && (
                       <p className="text-xs text-gray-500">UGX {selectedItem.price_ugx.toLocaleString()}</p>
                     )}
                   </div>
                 </div>
-                <button className="w-full bg-pink-600 text-white py-2 md:py-3 rounded-lg md:rounded-xl font-medium hover:bg-pink-700 transition mt-2 md:mt-3 shadow-md text-sm md:text-base">
+                <button className="w-full bg-pink-600 text-white py-3 rounded-lg font-medium hover:bg-pink-700 transition mt-3 shadow-sm">
                   Buy Now
                 </button>
               </div>
 
-              {/* Album Songs - Only for albums */}
+              {/* Album Songs */}
               {selectedItem.type === 'album' && albumSongs.length > 0 && (
                 <div>
-                  <h3 className="font-semibold text-gray-800 text-sm md:text-base mb-3 md:mb-4">Tracklist</h3>
-                  <div className="space-y-1 md:space-y-2">
+                  <h3 className="font-semibold text-gray-800 text-sm mb-3">Tracklist</h3>
+                  <div className="space-y-2">
                     {albumSongs.map((song, index) => (
-                      <div key={song.id} className="flex items-center justify-between p-2 md:p-3 bg-pink-50/50 rounded-lg md:rounded-xl hover:bg-pink-100/50 transition">
-                        <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1">
-                          <span className="text-gray-400 text-xs md:text-sm w-4 md:w-6">{index + 1}.</span>
+                      <div key={song.id} className="flex items-center justify-between p-2 bg-pink-50/50 rounded-lg hover:bg-pink-100/50 transition">
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                          <span className="text-gray-400 text-xs w-5">{index + 1}.</span>
                           <div className="min-w-0 flex-1">
-                            <p className="font-medium text-gray-800 text-xs md:text-sm truncate">{song.title}</p>
+                            <p className="font-medium text-gray-800 text-sm truncate">{song.title}</p>
                             {song.duration && (
                               <p className="text-xs text-gray-500">{song.duration}</p>
                             )}
@@ -388,16 +381,16 @@ export default function MusicPage() {
                               e.stopPropagation()
                               handlePlay(song.audio_url, song.id, e)
                             }}
-                            className={`w-6 h-6 md:w-8 md:h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                            className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 ${
                               playingId === song.id 
                                 ? 'bg-pink-600 text-white' 
                                 : 'bg-white hover:bg-pink-600 hover:text-white'
                             }`}
                           >
                             {playingId === song.id ? (
-                              <Pause size={10} className="md:w-3 md:h-3" />
+                              <Pause size={12} />
                             ) : (
-                              <Play size={10} className="md:w-3 md:h-3 ml-0.5" />
+                              <Play size={12} className="ml-0.5" />
                             )}
                           </button>
                         )}

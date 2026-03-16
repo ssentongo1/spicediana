@@ -14,7 +14,9 @@ import {
   X
 } from 'lucide-react'
 import { useState, useEffect } from 'react'
+import Image from 'next/image'
 import { supabase } from '@/lib/supabaseClient'
+import LoadingSpinner from '@/components/LoadingSpinner'
 
 // Types
 interface Announcement {
@@ -26,6 +28,13 @@ interface Announcement {
   urgent: boolean
   created_at: string
   user_id?: number | null
+  profiles?: {
+    username: string
+    full_name: string
+    avatar_url: string | null
+    is_spice: boolean
+    is_verified: boolean
+  } | null
 }
 
 export default function OfficialPage() {
@@ -34,39 +43,29 @@ export default function OfficialPage() {
   const [selectedType, setSelectedType] = useState<string>('all')
   const [selectedAnnouncement, setSelectedAnnouncement] = useState<Announcement | null>(null)
   const [showModal, setShowModal] = useState(false)
-  const [spiceProfile, setSpiceProfile] = useState<any>(null)
 
   useEffect(() => {
-    fetchSpiceProfile()
     fetchAnnouncements()
   }, [])
-
-  async function fetchSpiceProfile() {
-    try {
-      const { data } = await supabase
-        .from('profiles')
-        .select('id, username, full_name, avatar_url, is_spice, is_verified')
-        .eq('is_spice', true)
-        .single()
-      
-      setSpiceProfile(data)
-    } catch (error) {
-      console.error('Error fetching spice profile:', error)
-    }
-  }
 
   async function fetchAnnouncements() {
     setLoading(true)
     try {
-      // Simple fetch - just announcements
-      const { data, error } = await supabase
+      const { data: announcementsData } = await supabase
         .from('announcements')
-        .select('*')
+        .select(`
+          *,
+          profiles:user_id (
+            username,
+            full_name,
+            avatar_url,
+            is_spice,
+            is_verified
+          )
+        `)
         .order('created_at', { ascending: false })
 
-      if (error) throw error
-      
-      setAnnouncements(data || [])
+      setAnnouncements(announcementsData || [])
     } catch (error: any) {
       console.error('Error fetching announcements:', error.message)
     } finally {
@@ -105,19 +104,13 @@ export default function OfficialPage() {
     setShowModal(true)
   }
 
+  // PREMIUM LOADING SPINNER
   if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-b from-pink-50 to-white flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-pink-200 border-t-pink-600 rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading announcements...</p>
-        </div>
-      </div>
-    )
+    return <LoadingSpinner />
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-pink-50 to-white pb-24">
+    <div className="min-h-screen bg-gradient-to-b from-pink-50 to-white pb-20">
       {/* Header */}
       <header className="bg-white/80 backdrop-blur-md border-b border-pink-100 p-4 sticky top-0 z-20 shadow-sm">
         <div className="max-w-4xl mx-auto flex items-center">
@@ -170,8 +163,7 @@ export default function OfficialPage() {
         {filteredAnnouncements.length > 0 ? (
           <div className="space-y-4">
             {filteredAnnouncements.map((item) => {
-              // Check if this is Spice's post (user_id matches spice profile)
-              const isSpicePost = spiceProfile && item.user_id === spiceProfile.id
+              const isSpicePost = item.profiles?.is_spice === true
               
               return (
                 <div 
@@ -189,7 +181,6 @@ export default function OfficialPage() {
                     {/* Header */}
                     <div className="flex flex-wrap items-center gap-2 mb-3">
                       {isSpicePost ? (
-                        // Spice's post header
                         <>
                           <div className="flex items-center gap-2">
                             <div className="w-8 h-8 bg-[#1DA1F2] rounded-full flex items-center justify-center">
@@ -205,7 +196,6 @@ export default function OfficialPage() {
                           <span className="text-xs text-gray-400 ml-auto">{item.date}</span>
                         </>
                       ) : (
-                        // Regular announcement header
                         <>
                           <span className={`px-2 py-0.5 md:px-3 md:py-1 rounded-full text-xs font-medium border flex items-center gap-1 ${getTypeColor(item.type)}`}>
                             {getTypeIcon(item.type)}
@@ -256,9 +246,7 @@ export default function OfficialPage() {
           </div>
         ) : (
           <div className="bg-white rounded-2xl p-8 md:p-16 text-center border border-pink-100">
-            <div className="w-16 h-16 md:w-20 md:h-20 bg-pink-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Megaphone size={24} className="md:w-8 md:h-8 text-pink-400" />
-            </div>
+            <Megaphone size={40} className="mx-auto text-pink-300 mb-4" />
             <h3 className="text-lg md:text-xl font-semibold text-gray-800 mb-2">No announcements yet</h3>
             <p className="text-sm md:text-base text-gray-500">Check back soon for official updates</p>
           </div>
@@ -267,13 +255,13 @@ export default function OfficialPage() {
 
       {/* Announcement Details Modal */}
       {showModal && selectedAnnouncement && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-2 md:p-4">
-          <div className="bg-white w-full max-w-2xl rounded-xl md:rounded-3xl shadow-2xl max-h-[98vh] md:max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white w-full max-w-2xl rounded-xl shadow-2xl max-h-[90vh] overflow-y-auto">
             {/* Modal Header */}
-            <div className="sticky top-0 bg-white border-b border-pink-100 p-3 md:p-6 rounded-t-xl md:rounded-t-3xl">
-              <div className="flex items-start gap-2 md:gap-4">
-                <div className="w-10 h-10 md:w-12 md:h-12 bg-pink-100 rounded-lg md:rounded-xl flex items-center justify-center flex-shrink-0">
-                  {spiceProfile && selectedAnnouncement.user_id === spiceProfile.id ? (
+            <div className="sticky top-0 bg-white border-b border-pink-100 p-4 rounded-t-xl">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 md:w-12 md:h-12 bg-pink-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                  {selectedAnnouncement.profiles?.is_spice ? (
                     <div className="w-full h-full bg-[#1DA1F2] rounded-lg flex items-center justify-center">
                       <Crown size={18} className="md:w-6 md:h-6 text-white" />
                     </div>
@@ -285,7 +273,7 @@ export default function OfficialPage() {
                 </div>
                 <div className="flex-1 min-w-0 pr-8">
                   <h2 className="text-base md:text-2xl font-bold text-gray-800 line-clamp-2">
-                    {spiceProfile && selectedAnnouncement.user_id === spiceProfile.id ? (
+                    {selectedAnnouncement.profiles?.is_spice ? (
                       <span className="flex items-center gap-2">
                         ✨ {selectedAnnouncement.title}
                       </span>
@@ -294,7 +282,7 @@ export default function OfficialPage() {
                     )}
                   </h2>
                   <div className="flex flex-wrap items-center gap-2 mt-1">
-                    {spiceProfile && selectedAnnouncement.user_id === spiceProfile.id ? (
+                    {selectedAnnouncement.profiles?.is_spice ? (
                       <div className="flex items-center gap-2">
                         <span className="text-sm text-gray-600">Spice Diana</span>
                         <div className="flex items-center justify-center w-5 h-5 bg-[#1DA1F2] rounded-full">
@@ -325,9 +313,9 @@ export default function OfficialPage() {
                 </div>
                 <button 
                   onClick={() => setShowModal(false)}
-                  className="absolute top-3 right-3 md:static w-8 h-8 md:w-10 md:h-10 rounded-full hover:bg-pink-50 flex items-center justify-center transition flex-shrink-0"
+                  className="w-8 h-8 rounded-full hover:bg-pink-50 flex items-center justify-center"
                 >
-                  <X size={16} className="md:w-5 md:h-5 text-gray-500" />
+                  <X size={16} className="text-gray-500" />
                 </button>
               </div>
             </div>
@@ -341,16 +329,16 @@ export default function OfficialPage() {
               </div>
 
               {/* Official Signature */}
-              <div className="mt-6 md:mt-8 pt-4 md:pt-6 border-t border-pink-100 flex items-center gap-2">
+              <div className="mt-6 pt-4 border-t border-pink-100 flex items-center gap-2">
                 <div className="w-6 h-6 md:w-8 md:h-8 bg-pink-100 rounded-full flex items-center justify-center">
-                  {spiceProfile && selectedAnnouncement.user_id === spiceProfile.id ? (
+                  {selectedAnnouncement.profiles?.is_spice ? (
                     <Crown size={12} className="md:w-4 md:h-4 text-[#1DA1F2]" />
                   ) : (
                     <Megaphone size={12} className="md:w-4 md:h-4 text-pink-600" />
                   )}
                 </div>
                 <span className="text-xs md:text-sm text-gray-500">
-                  — {spiceProfile && selectedAnnouncement.user_id === spiceProfile.id ? 'Spice Diana' : 'Spice Diana Official'}
+                  — {selectedAnnouncement.profiles?.is_spice ? 'Spice Diana' : 'Spice Diana Official'}
                 </span>
               </div>
             </div>
