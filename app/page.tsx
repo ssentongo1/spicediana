@@ -953,7 +953,7 @@ export default function HomePage() {
                 </div>
               </div>
 
-              {/* Media Carousel - Clickable via overlay */}
+              {/* Media Carousel - Clickable via overlay with working swipe */}
               <div className="relative w-full bg-black">
                 {/* Clickable overlay for navigation */}
                 <div 
@@ -963,17 +963,22 @@ export default function HomePage() {
                 
                 <Swiper
                   modules={[Navigation, Pagination]}
-                  navigation={{
+                  navigation={!isMobile ? {
                     prevEl: `.swiper-button-prev-${post.id}`,
                     nextEl: `.swiper-button-next-${post.id}`,
+                  } : false}
+                  pagination={{ 
+                    clickable: true,
+                    dynamicBullets: true
                   }}
-                  pagination={{ clickable: true }}
                   spaceBetween={0}
                   slidesPerView={1}
                   onSlideChange={(swiper) => {
                     setActiveSlide(prev => ({ ...prev, [post.id]: swiper.activeIndex }))
                   }}
                   className="aspect-[1/2] md:aspect-auto md:h-[70vh] relative z-0"
+                  touchRatio={1}
+                  simulateTouch={true}
                 >
                   {post.media.map((media, index) => {
                     const muteKey = `${post.id}-${media.id}`
